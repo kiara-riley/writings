@@ -114,3 +114,21 @@ So lets make it slightly more complex with another algebra
 >   user <- getUserById 12
 >   logString $ show $ age user
 >   pure $ name user
+
+Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural transformations from a Functor f to a Monad m: `f :~> m`
+> interpret
+>   :: (Functor f, Monad m)
+>   => f :~> m -> Free f a -> m a
+> interpret t prog = foldFree (run t) prog
+
+> dbInterpret :: DBRequest :~> DB
+> dbInterpret = nat t
+>   where
+>     t (GetUserById id next) = dbUserById id >>= pure . next
+>     t (GetUserByName name next) = fmap Just (dbUserByName name) >>= pure . next
+>     t (GetItemById id next) = dbItemById id >>= pure . next
+
+> logInterpret :: Logging :~> IO
+> logInterpret = nat t
+>   where
+>     t (Log str next) = putStrLn str >> pure next
