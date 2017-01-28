@@ -1,20 +1,24 @@
-## https://github.com/github/gitignore/blob/master/TeX.gitignore
-## Core latex/pdflatex auxiliary files:
+## https://github.com/github/gitignore/blob/master/Haskell.gitignore
+dist
+dist-*
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+*.prof
 *.aux
-*.lof
-*.log
-*.lot
-*.fls
-*.out
-*.toc
-*.fmt
-*.fot
-*.cb
-*.cb2
-*.ptb
-
-## Don't care about generated files, regen them if needed
-*.pdf
+*.hp
+*.eventlog
+.stack-work/
+cabal.project.local
+.HTF/
 
 ## vim
 *.swp
