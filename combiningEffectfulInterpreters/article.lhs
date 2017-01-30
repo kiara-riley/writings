@@ -152,3 +152,8 @@ And now we can run our program that contains our two algebras
 
 > runProgram :: IO String
 > runProgram = interpret (combineInterpreters  logInterpret (dbToIO . dbInterpret)) realProgram
+
+
+TODO:
+* Testing Interpreters
+* Maybe a typeclass-based interpreter example
