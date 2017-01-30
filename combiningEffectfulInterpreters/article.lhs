@@ -20,7 +20,10 @@ Lets import necessary packages
 > import Data.Comp
 > import Data.Comp.Ops
 >
-> main = putStrLn "Hello, World!"
+> main = do
+>   s <- runProgram
+>   putStrLn ""
+>   putStrLn s
 
 Lets define some Types for a simple DB with two tables User and Item
 
@@ -116,6 +119,7 @@ So lets make it slightly more complex with another algebra
 >   pure $ name user
 
 Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural transformations from a Functor f to a Monad m: `f :~> m`
+
 > interpret
 >   :: (Functor f, Monad m)
 >   => f :~> m -> Free f a -> m a
@@ -128,7 +132,23 @@ Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural trans
 >     t (GetUserByName name next) = fmap Just (dbUserByName name) >>= pure . next
 >     t (GetItemById id next) = dbItemById id >>= pure . next
 
+> dbToIO :: DB :~> IO
+> dbToIO = nat unDB
+
 > logInterpret :: Logging :~> IO
 > logInterpret = nat t
 >   where
 >     t (Log str next) = putStrLn str >> pure next
+
+Now we can define a simple combinator that can interpret two algebras to one Monad
+
+> combineInterpreters :: f :~> m -> g :~> m -> (f :+: g) :~> m
+> combineInterpreters f g = nat t
+>   where
+>     t (Inl l) = (run f) l
+>     t (Inr r) = (run g) r
+
+And now we can run our program that contains our two algebras
+
+> runProgram :: IO String
+> runProgram = interpret (combineInterpreters  logInterpret (dbToIO . dbInterpret)) realProgram
