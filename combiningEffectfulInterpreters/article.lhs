@@ -1,31 +1,33 @@
 Combining Effectful Interpreters
 ===
 
-This is one method to combine completely separate Free Algebras and their Interpreters.
+This is one method to combine separate free algebras and their (monadic) interpreters.
 
-These are necessary pragmas
+This is a literate Haskell document. You can run it as is through `ghc`. IE: `stack runghc article.lhs`. As such we need some boilerplate to get everything running:
 
 > {-# LANGUAGE TypeOperators #-}
 > {-# LANGUAGE DeriveFunctor #-}
 > {-# LANGUAGE FlexibleContexts #-}
-
-Lets import necessary packages
-
+>
+> import Prelude hiding ((.))
+>
+> import Control.Category ((.))
 > import Control.Monad.Free
 > import Control.Monad.IO.Class
+> import Control.Monad.State
 > import Control.Natural
-> import Prelude hiding ((.))
-> import Control.Category ((.))
+> import Data.Functor.Identity
 >
 > import Data.Comp
 > import Data.Comp.Ops
 >
-> main = do
->   s <- runProgram
->   putStrLn ""
->   putStrLn s
 
-Lets define some Types for a simple DB with two tables User and Item
+The end result will be to do things like this:
+
+> main = do
+>   putStrLn "Hello, world"
+
+Lets define some Types for a simple DB with two tables: User and Item
 
 > data User = User
 >   { name :: String
@@ -40,7 +42,7 @@ Lets define some Types for a simple DB with two tables User and Item
 >   , itemDBId :: Int
 >   } deriving (Show)
 
-Here is an algebra we can use with `Free`
+Here is an algebra we can use with `Free`:
 
 > data DBRequest a
 >   = GetUserById Int (User -> a)
@@ -48,7 +50,7 @@ Here is an algebra we can use with `Free`
 >   | GetItemById Int (Item -> a)
 >   deriving (Functor)
 
-And some helper functions to make our algebra work with other algebras. Standard Data.Comp stuff
+These are some helper functions to make our algebra work with other algebras. Standard compdata usage. See [Data types à la carte](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/div-classtitledata-types-a-la-cartediv/14416CB20C4637164EA9F77097909409) to learn about the principals used.
 
 > getUserById ::
 >   (Functor f, MonadFree f m, DBRequest :<: f)
@@ -65,7 +67,7 @@ And some helper functions to make our algebra work with other algebras. Standard
 >   => Int -> m Item
 > getItemById dbid = liftF . inj $ GetItemById dbid id
 
-Ok now lets actually emulate(through the magic of Monads!) the DB
+Ok, let's emulate the DB here so we can pretend we don't call the DB through IO.
 
 > data DB a = DB
 >   { unDB :: IO a
@@ -99,9 +101,14 @@ And a simple free program based on this algebra:
 
 Ok that is easy to interpret though:
 
--- Example here
+> simpleResult :: String
+> simpleResult = iter t (getUsersName 10)
+>   where
+>     t (GetUserById id next) = next (User "Bob" id [] id)
+>     t (GetUserByName name next) = next (Just $ User name 0 [] 0)
+>     t (GetItemById id next) = next (Item "item" "test" id)
 
-So lets make it slightly more complex with another algebra
+So lets make it slightly more complex by adding another algebra so we can do some logging when we need to debug later.
 
 > data Logging a
 >  = Log String a
@@ -112,13 +119,19 @@ So lets make it slightly more complex with another algebra
 >  => String -> m ()
 > logString str = liftF . inj $ Log str ()
 
+Here is an example of a program that combines those algebras:
+
 > realProgram :: Free (Logging :+: DBRequest) String
 > realProgram = do
 >   user <- getUserById 12
->   logString $ show $ age user
+>   logString $
+>     "Got user #" ++
+>     (show 12) ++
+>     ", their age is: " ++
+>     (show $ age user)
 >   pure $ name user
 
-Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural transformations from a Functor f to a Monad m: `f :~> m`
+Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural transformations from a Functor f to a Monad m: `f :~> m`:
 
 > interpret
 >   :: (Functor f, Monad m)
@@ -140,7 +153,7 @@ Now, using `Control.Monad.Free.foldFree`, Interpreters can just be natural trans
 >   where
 >     t (Log str next) = putStrLn str >> pure next
 
-Now we can define a simple combinator that can interpret two algebras to one Monad
+Now we can define a simple combinator that can interpret two algebras to one Monad:
 
 > combineInterpreters :: f :~> m -> g :~> m -> (f :+: g) :~> m
 > combineInterpreters f g = nat t
@@ -148,11 +161,16 @@ Now we can define a simple combinator that can interpret two algebras to one Mon
 >     t (Inl l) = (run f) l
 >     t (Inr r) = (run g) r
 
-And now we can run our program that contains our two algebras
+And now we can run our program that contains our two algebras:
+
+> realInterpreter :: (Logging :+: DBRequest) :~> IO
+> realInterpreter = combineInterpreters  logInterpret (dbToIO . dbInterpret)
 
 > runProgram :: IO String
-> runProgram = interpret (combineInterpreters  logInterpret (dbToIO . dbInterpret)) realProgram
+> runProgram = interpret realInterpreter realProgram
 
+> identityToState :: Identity :~> State [String]
+> identityToState = nat (pure . runIdentity)
 
 TODO:
 * Testing Interpreters
