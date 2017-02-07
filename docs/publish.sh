@@ -22,6 +22,8 @@ if [[ $OUT != *"Your branch is up-to-date with"* ]] || [[ $OUT != *"working tree
   die "You have not pushed these changes yet. I won't automatically publish these changes until you have pushed them."
 fi
 
+stack exec docs clean
+stack exec docs build
 
 cd ../build
 rm -r ./*
@@ -29,6 +31,7 @@ cp -r ../docs/_site/* ./
 git add .
 git commit -m "$COMMIT"
 git push origin master
+
 cd ..
 git add build
 git commit -m "$COMMIT"
