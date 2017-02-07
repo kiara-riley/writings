@@ -4,7 +4,9 @@ title: Combining Effectful Interpreters
 
 This is one method to combine separate free algebras and their (monadic) interpreters.
 
-This is a literate Haskell document. You can run it as is through `ghc`. IE: `stack runghc article.lhs`. As such we need some boilerplate to get everything running:
+This is a literate Haskell document. You can run it as is through `ghc`. IE: `stack runghc article.lhs`. You can find the source [here](https://raw.githubusercontent.com/kraigmckernan/writings/master/combiningEffectfulInterpreters/article.lhs).
+
+As a literate document, we need some boilerplate to get everything running:
 
 > {-# LANGUAGE TypeOperators #-}
 > {-# LANGUAGE DeriveFunctor #-}
