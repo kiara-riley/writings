@@ -169,9 +169,27 @@ And now we can run our program that contains our two algebras:
 > runProgram :: IO String
 > runProgram = interpret realInterpreter realProgram
 
+We can test our programs with test interpreters
+
+> testDB :: DBRequest :~> Identity
+> testDB = nat t
+>   where
+>    t (GetUserById id next) = pure $ next (User "test" 20 [] id)
+>    t (GetUserByName name next) = pure $ next Nothing
+>    t (GetItemById id next) = pure $ next (Item "test" "test" id)
+
+> testLogger :: Logging :~> State [String]
+> testLogger = nat t
+>  where
+>   t (Log str next) = modify (\arr -> arr ++ [str]) >> pure next
+
 > identityToState :: Identity :~> State [String]
 > identityToState = nat (pure . runIdentity)
 
-TODO:
-* Testing Interpreters
-* Maybe a typeclass-based interpreter example
+> testInterpreter :: (Logging :+: DBRequest) :~> State [String]
+> testInterpreter = combineInterpreters testLogger (identityToState . testDB)
+
+Now we can test our program's logic.
+
+> testProgram :: (String, [String])
+> testProgram = runState (interpret testInterpreter realProgram) []
