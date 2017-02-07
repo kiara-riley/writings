@@ -25,7 +25,16 @@ This is a literate Haskell document. You can run it as is through `ghc`. IE: `st
 The end result will be to do things like this:
 
 > main = do
->   putStrLn "Hello, world"
+>   putStrLn "A Simple Interpreter:"
+>   putStrLn $ simpleResult
+>
+>   putStrLn ""
+>   putStrLn "A program that combines algebras:"
+>   runProgram >>= putStrLn
+>
+>   putStrLn ""
+>   putStrLn "Testing program(Result should be (\"test\", [\"Got user #12, their age is: 20\"])):"
+>   putStrLn $ show testProgram
 
 Lets define some Types for a simple DB with two tables: User and Item
 
@@ -193,3 +202,5 @@ Now we can test our program's logic.
 
 > testProgram :: (String, [String])
 > testProgram = runState (interpret testInterpreter realProgram) []
+
+The benefit of this approach is that we can seperate our interpreters from our programs. Our code becomes values that we can test or run in anyway we want. In this example, we could use this method to have switch Databases with typesafe guarentees that no business is affected. It also means we could use many datastores with different types of interpeters in concert while easily testing business logic that combines them.
