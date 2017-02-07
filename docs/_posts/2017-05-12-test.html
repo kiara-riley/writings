@@ -1,0 +1,215 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Combining Effectful Free Monad Interpreters</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+  </style>
+</head>
+<body>
+<div id="header">
+<h1 class="title">Combining Effectful Free Monad Interpreters</h1>
+</div>
+<h1 id="combining-effectful-interpreters">Combining Effectful Interpreters</h1>
+<p>This is one method to combine separate free algebras and their (monadic) interpreters.</p>
+<p>This is a literate Haskell document. You can run it as is through <code>ghc</code>. IE: <code>stack runghc article.lhs</code>. As such we need some boilerplate to get everything running:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE TypeOperators #-}</span>
+<span class="ot">{-# LANGUAGE DeriveFunctor #-}</span>
+<span class="ot">{-# LANGUAGE FlexibleContexts #-}</span>
+
+<span class="kw">import </span><span class="dt">Prelude</span> <span class="kw">hiding</span> ((.))
+
+<span class="kw">import </span><span class="dt">Control.Category</span> ((.))
+<span class="kw">import </span><span class="dt">Control.Monad.Free</span>
+<span class="kw">import </span><span class="dt">Control.Monad.IO.Class</span>
+<span class="kw">import </span><span class="dt">Control.Monad.State</span>
+<span class="kw">import </span><span class="dt">Control.Natural</span>
+<span class="kw">import </span><span class="dt">Data.Functor.Identity</span>
+
+<span class="kw">import </span><span class="dt">Data.Comp</span>
+<span class="kw">import </span><span class="dt">Data.Comp.Ops</span></code></pre></div>
+<p>The end result will be to do things like this:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell">main <span class="fu">=</span> <span class="kw">do</span>
+  putStrLn <span class="st">&quot;A Simple Interpreter:&quot;</span>
+  putStrLn <span class="fu">$</span> simpleResult
+
+  putStrLn <span class="st">&quot;&quot;</span>
+  putStrLn <span class="st">&quot;A program that combines algebras:&quot;</span>
+  runProgram <span class="fu">&gt;&gt;=</span> putStrLn
+
+  putStrLn <span class="st">&quot;&quot;</span>
+  putStrLn <span class="st">&quot;Testing program(Result should be (\&quot;test\&quot;, [\&quot;Got user #12, their age is: 20\&quot;])):&quot;</span>
+  putStrLn <span class="fu">$</span> show testProgram</code></pre></div>
+<p>Lets define some Types for a simple DB with two tables: User and Item</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">User</span> <span class="fu">=</span> <span class="dt">User</span>
+  {<span class="ot"> name ::</span> <span class="dt">String</span>
+  ,<span class="ot">  age ::</span> <span class="dt">Int</span>
+  ,<span class="ot">  items ::</span> [<span class="dt">Item</span>]
+  ,<span class="ot">  userDBId ::</span> <span class="dt">Int</span>
+  } <span class="kw">deriving</span> (<span class="dt">Show</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Item</span> <span class="fu">=</span> <span class="dt">Item</span>
+  {<span class="ot"> title ::</span> <span class="dt">String</span>
+  ,<span class="ot"> stuff ::</span> <span class="dt">String</span>
+  ,<span class="ot"> itemDBId ::</span> <span class="dt">Int</span>
+  } <span class="kw">deriving</span> (<span class="dt">Show</span>)</code></pre></div>
+<p>Here is an algebra we can use with <code>Free</code>:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">DBRequest</span> a
+  <span class="fu">=</span> <span class="dt">GetUserById</span> <span class="dt">Int</span> (<span class="dt">User</span> <span class="ot">-&gt;</span> a)
+  <span class="fu">|</span> <span class="dt">GetUserByName</span> <span class="dt">String</span> (<span class="dt">Maybe</span> <span class="dt">User</span> <span class="ot">-&gt;</span> a)
+  <span class="fu">|</span> <span class="dt">GetItemById</span> <span class="dt">Int</span> (<span class="dt">Item</span> <span class="ot">-&gt;</span> a)
+  <span class="kw">deriving</span> (<span class="dt">Functor</span>)</code></pre></div>
+<p>These are some helper functions to make our algebra work with other algebras. Standard compdata usage. See <a href="https://www.cambridge.org/core/journals/journal-of-functional-programming/article/div-classtitledata-types-a-la-cartediv/14416CB20C4637164EA9F77097909409">Data types à la carte</a> to learn about the principals used.</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell">getUserById <span class="ot">::</span>
+  (<span class="dt">Functor</span> f, <span class="dt">MonadFree</span> f m, <span class="dt">DBRequest</span> <span class="fu">:&lt;:</span> f)
+  <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> m <span class="dt">User</span>
+getUserById dbid <span class="fu">=</span> liftF <span class="fu">.</span> inj <span class="fu">$</span> <span class="dt">GetUserById</span> dbid id
+
+getUserByName <span class="ot">::</span>
+  (<span class="dt">Functor</span> f, <span class="dt">MonadFree</span> f m, <span class="dt">DBRequest</span> <span class="fu">:&lt;:</span> f)
+  <span class="ot">=&gt;</span> <span class="dt">String</span> <span class="ot">-&gt;</span> m (<span class="dt">Maybe</span> <span class="dt">User</span>)
+getUserByName name <span class="fu">=</span> liftF <span class="fu">.</span> inj <span class="fu">$</span> <span class="dt">GetUserByName</span> name id
+
+getItemById <span class="ot">::</span>
+  (<span class="dt">Functor</span> f, <span class="dt">MonadFree</span> f m, <span class="dt">DBRequest</span> <span class="fu">:&lt;:</span> f)
+  <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> m <span class="dt">Item</span>
+getItemById dbid <span class="fu">=</span> liftF <span class="fu">.</span> inj <span class="fu">$</span> <span class="dt">GetItemById</span> dbid id</code></pre></div>
+<p>Ok, let's emulate the DB here so we can pretend we don't call the DB through IO.</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">DB</span> a <span class="fu">=</span> <span class="dt">DB</span>
+  {<span class="ot"> unDB ::</span> <span class="dt">IO</span> a
+  } <span class="kw">deriving</span> (<span class="dt">Functor</span>)
+
+<span class="kw">instance</span> <span class="dt">Applicative</span> <span class="dt">DB</span> <span class="kw">where</span>
+  pure a <span class="fu">=</span> <span class="dt">DB</span> <span class="fu">$</span> pure a
+  (<span class="dt">DB</span> f) <span class="fu">&lt;*&gt;</span> (<span class="dt">DB</span> a) <span class="fu">=</span> <span class="dt">DB</span> <span class="fu">$</span> f <span class="fu">&lt;*&gt;</span> a
+<span class="kw">instance</span> <span class="dt">Monad</span> <span class="dt">DB</span> <span class="kw">where</span>
+  (<span class="dt">DB</span> a) <span class="fu">&gt;&gt;=</span> f <span class="fu">=</span> <span class="dt">DB</span> <span class="fu">$</span> a <span class="fu">&gt;&gt;=</span> \x <span class="ot">-&gt;</span> unDB (f x)
+<span class="kw">instance</span> <span class="dt">MonadIO</span> <span class="dt">DB</span> <span class="kw">where</span>
+  liftIO <span class="fu">=</span> <span class="dt">DB</span>
+
+<span class="ot">dbUserById ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">DB</span> <span class="dt">User</span>
+dbUserById id <span class="fu">=</span> pure <span class="fu">$</span> <span class="dt">User</span> <span class="st">&quot;Frank&quot;</span> id [] id
+
+<span class="ot">dbUserByName ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">DB</span> <span class="dt">User</span>
+dbUserByName name <span class="fu">=</span> pure <span class="fu">$</span> <span class="dt">User</span> name <span class="dv">13</span> [] <span class="dv">13</span>
+
+<span class="ot">dbItemById ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">DB</span> <span class="dt">Item</span>
+dbItemById id <span class="fu">=</span> pure <span class="fu">$</span> <span class="dt">Item</span> <span class="st">&quot;Thingy&quot;</span> <span class="st">&quot;stuffs&quot;</span> id</code></pre></div>
+<p>And a simple free program based on this algebra:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell">getUsersName <span class="ot">::</span>
+  (<span class="dt">Functor</span> f, <span class="dt">MonadFree</span> f m, <span class="dt">DBRequest</span> <span class="fu">:&lt;:</span> f)
+  <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> m <span class="dt">String</span>
+getUsersName dbid <span class="fu">=</span> <span class="kw">do</span>
+  user <span class="ot">&lt;-</span> getUserById dbid
+  pure <span class="fu">$</span> name user</code></pre></div>
+<p>Ok that is easy to interpret though:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">simpleResult ::</span> <span class="dt">String</span>
+simpleResult <span class="fu">=</span> iter t (getUsersName <span class="dv">10</span>)
+  <span class="kw">where</span>
+    t (<span class="dt">GetUserById</span> id next) <span class="fu">=</span> next (<span class="dt">User</span> <span class="st">&quot;Bob&quot;</span> id [] id)
+    t (<span class="dt">GetUserByName</span> name next) <span class="fu">=</span> next (<span class="dt">Just</span> <span class="fu">$</span> <span class="dt">User</span> name <span class="dv">0</span> [] <span class="dv">0</span>)
+    t (<span class="dt">GetItemById</span> id next) <span class="fu">=</span> next (<span class="dt">Item</span> <span class="st">&quot;item&quot;</span> <span class="st">&quot;test&quot;</span> id)</code></pre></div>
+<p>So lets make it slightly more complex by adding another algebra so we can do some logging when we need to debug later.</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Logging</span> a
+ <span class="fu">=</span> <span class="dt">Log</span> <span class="dt">String</span> a
+ <span class="kw">deriving</span> (<span class="dt">Functor</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell">logString <span class="ot">::</span>
+ (<span class="dt">Functor</span> f, <span class="dt">MonadFree</span> f m, <span class="dt">Logging</span> <span class="fu">:&lt;:</span> f)
+ <span class="ot">=&gt;</span> <span class="dt">String</span> <span class="ot">-&gt;</span> m ()
+logString str <span class="fu">=</span> liftF <span class="fu">.</span> inj <span class="fu">$</span> <span class="dt">Log</span> str ()</code></pre></div>
+<p>Here is an example of a program that combines those algebras:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">realProgram ::</span> <span class="dt">Free</span> (<span class="dt">Logging</span> <span class="fu">:+:</span> <span class="dt">DBRequest</span>) <span class="dt">String</span>
+realProgram <span class="fu">=</span> <span class="kw">do</span>
+  user <span class="ot">&lt;-</span> getUserById <span class="dv">12</span>
+  logString <span class="fu">$</span>
+    <span class="st">&quot;Got user #&quot;</span> <span class="fu">++</span>
+    (show <span class="dv">12</span>) <span class="fu">++</span>
+    <span class="st">&quot;, their age is: &quot;</span> <span class="fu">++</span>
+    (show <span class="fu">$</span> age user)
+  pure <span class="fu">$</span> name user</code></pre></div>
+<p>Now, using <code>Control.Monad.Free.foldFree</code>, Interpreters can just be natural transformations from a Functor f to a Monad m: <code>f :~&gt; m</code>:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret
+<span class="ot">  ::</span> (<span class="dt">Functor</span> f, <span class="dt">Monad</span> m)
+  <span class="ot">=&gt;</span> f <span class="fu">:~&gt;</span> m <span class="ot">-&gt;</span> <span class="dt">Free</span> f a <span class="ot">-&gt;</span> m a
+interpret t prog <span class="fu">=</span> foldFree (run t) prog</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">dbInterpret ::</span> <span class="dt">DBRequest</span> <span class="fu">:~&gt;</span> <span class="dt">DB</span>
+dbInterpret <span class="fu">=</span> nat t
+  <span class="kw">where</span>
+    t (<span class="dt">GetUserById</span> id next) <span class="fu">=</span> dbUserById id <span class="fu">&gt;&gt;=</span> pure <span class="fu">.</span> next
+    t (<span class="dt">GetUserByName</span> name next) <span class="fu">=</span> fmap <span class="dt">Just</span> (dbUserByName name) <span class="fu">&gt;&gt;=</span> pure <span class="fu">.</span> next
+    t (<span class="dt">GetItemById</span> id next) <span class="fu">=</span> dbItemById id <span class="fu">&gt;&gt;=</span> pure <span class="fu">.</span> next</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">dbToIO ::</span> <span class="dt">DB</span> <span class="fu">:~&gt;</span> <span class="dt">IO</span>
+dbToIO <span class="fu">=</span> nat unDB</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">logInterpret ::</span> <span class="dt">Logging</span> <span class="fu">:~&gt;</span> <span class="dt">IO</span>
+logInterpret <span class="fu">=</span> nat t
+  <span class="kw">where</span>
+    t (<span class="dt">Log</span> str next) <span class="fu">=</span> putStrLn str <span class="fu">&gt;&gt;</span> pure next</code></pre></div>
+<p>Now we can define a simple combinator that can interpret two algebras to one Monad:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">combineInterpreters ::</span> f <span class="fu">:~&gt;</span> m <span class="ot">-&gt;</span> g <span class="fu">:~&gt;</span> m <span class="ot">-&gt;</span> (f <span class="fu">:+:</span> g) <span class="fu">:~&gt;</span> m
+combineInterpreters f g <span class="fu">=</span> nat t
+  <span class="kw">where</span>
+    t (<span class="dt">Inl</span> l) <span class="fu">=</span> (run f) l
+    t (<span class="dt">Inr</span> r) <span class="fu">=</span> (run g) r</code></pre></div>
+<p>And now we can run our program that contains our two algebras:</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">realInterpreter ::</span> (<span class="dt">Logging</span> <span class="fu">:+:</span> <span class="dt">DBRequest</span>) <span class="fu">:~&gt;</span> <span class="dt">IO</span>
+realInterpreter <span class="fu">=</span> combineInterpreters  logInterpret (dbToIO <span class="fu">.</span> dbInterpret)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">runProgram ::</span> <span class="dt">IO</span> <span class="dt">String</span>
+runProgram <span class="fu">=</span> interpret realInterpreter realProgram</code></pre></div>
+<p>We can test our programs with test interpreters</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">testDB ::</span> <span class="dt">DBRequest</span> <span class="fu">:~&gt;</span> <span class="dt">Identity</span>
+testDB <span class="fu">=</span> nat t
+  <span class="kw">where</span>
+   t (<span class="dt">GetUserById</span> id next) <span class="fu">=</span> pure <span class="fu">$</span> next (<span class="dt">User</span> <span class="st">&quot;test&quot;</span> <span class="dv">20</span> [] id)
+   t (<span class="dt">GetUserByName</span> name next) <span class="fu">=</span> pure <span class="fu">$</span> next <span class="dt">Nothing</span>
+   t (<span class="dt">GetItemById</span> id next) <span class="fu">=</span> pure <span class="fu">$</span> next (<span class="dt">Item</span> <span class="st">&quot;test&quot;</span> <span class="st">&quot;test&quot;</span> id)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">testLogger ::</span> <span class="dt">Logging</span> <span class="fu">:~&gt;</span> <span class="dt">State</span> [<span class="dt">String</span>]
+testLogger <span class="fu">=</span> nat t
+ <span class="kw">where</span>
+  t (<span class="dt">Log</span> str next) <span class="fu">=</span> modify (\arr <span class="ot">-&gt;</span> arr <span class="fu">++</span> [str]) <span class="fu">&gt;&gt;</span> pure next</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">identityToState ::</span> <span class="dt">Identity</span> <span class="fu">:~&gt;</span> <span class="dt">State</span> [<span class="dt">String</span>]
+identityToState <span class="fu">=</span> nat (pure <span class="fu">.</span> runIdentity)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">testInterpreter ::</span> (<span class="dt">Logging</span> <span class="fu">:+:</span> <span class="dt">DBRequest</span>) <span class="fu">:~&gt;</span> <span class="dt">State</span> [<span class="dt">String</span>]
+testInterpreter <span class="fu">=</span> combineInterpreters testLogger (identityToState <span class="fu">.</span> testDB)</code></pre></div>
+<p>Now we can test our program's logic.</p>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">testProgram ::</span> (<span class="dt">String</span>, [<span class="dt">String</span>])
+testProgram <span class="fu">=</span> runState (interpret testInterpreter realProgram) []</code></pre></div>
+<p>The benefit of this approach is that we can seperate our interpreters from our programs. Our code becomes values that we can test or run in anyway we want. In this example, we could use this method to have switch Databases with typesafe guarentees that no business is affected. It also means we could use many datastores with different types of interpeters in concert while easily testing business logic that combines them.</p>
+</body>
+</html>

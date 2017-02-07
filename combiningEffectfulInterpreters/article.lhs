@@ -1,3 +1,9 @@
+---
+layout: post
+title:  "Combining Effectful Free Monad Interpreters"
+categories: jekyll update
+---
+
 Combining Effectful Interpreters
 ===
 
@@ -5,22 +11,24 @@ This is one method to combine separate free algebras and their (monadic) interpr
 
 This is a literate Haskell document. You can run it as is through `ghc`. IE: `stack runghc article.lhs`. As such we need some boilerplate to get everything running:
 
-> {-# LANGUAGE TypeOperators #-}
-> {-# LANGUAGE DeriveFunctor #-}
-> {-# LANGUAGE FlexibleContexts #-}
->
-> import Prelude hiding ((.))
->
-> import Control.Category ((.))
-> import Control.Monad.Free
-> import Control.Monad.IO.Class
-> import Control.Monad.State
-> import Control.Natural
-> import Data.Functor.Identity
->
-> import Data.Comp
-> import Data.Comp.Ops
->
+\begin{code}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+
+import Prelude hiding ((.))
+
+import Control.Category ((.))
+import Control.Monad.Free
+import Control.Monad.IO.Class
+import Control.Monad.State
+import Control.Natural
+import Data.Functor.Identity
+
+import Data.Comp
+import Data.Comp.Ops
+\end{code}
+
 
 The end result will be to do things like this:
 
