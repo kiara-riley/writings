@@ -1,5 +1,6 @@
-Combining Effectful Interpreters
-===
+---
+title: Combining Effectful Interpreters
+---
 
 This is one method to combine separate free algebras and their (monadic) interpreters.
 
