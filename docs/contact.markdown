@@ -2,4 +2,4 @@
 title: Contact
 ---
 
-kraigmckernan@gmail.com
+[kraigmckernan@gmail.com](mailto:kraigmckernan@gmail.com)
