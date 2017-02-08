@@ -14,7 +14,7 @@ main =
     match "css/*" $ do
       route idRoute
       compile compressCssCompiler
-    match (fromList ["contact.markdown"]) $ do
+    match (fromList ["pages/about.md"]) $ do
       route $ setExtension "html"
       compile $
         pandocCompiler >>= loadAndApplyTemplate "templates/default.html" defaultContext >>=
@@ -26,7 +26,7 @@ main =
         pandocCompiler >>= loadAndApplyTemplate "templates/post.html" (addTags tags postCtx) >>=
         loadAndApplyTemplate "templates/default.html" postCtx >>=
         relativizeUrls
-    create ["archive.html"] $ do
+    create ["pages/archive.html"] $ do
       route idRoute
       compile $ do
         posts <- recentFirst =<< loadAll "posts/*"
