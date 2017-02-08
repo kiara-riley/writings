@@ -1,5 +1,9 @@
 ---
 title: Combining Effectful Interpreters
+date: 2017-02-06
+updated: 2017-02-07
+author: Kraig McKernan
+tags: free, monad, interpreter, data types a la carte
 ---
 
 This is one method to combine separate free algebras and their (monadic) interpreters.

@@ -1,7 +1,16 @@
 <div class="info">
     Posted on $date$
+    $if(updated)$
+        (Updated: $updated$)
+    $endif$
+    <br />
     $if(author)$
         by $author$
+    $endif$
+</div>
+<div class="info">
+    $if(tags)$
+        Tags: $tags$
     $endif$
 </div>
 
